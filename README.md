@@ -78,6 +78,7 @@ lib/
     backup_service.dart             JSON backup files
   presentation/
     cubits.dart                 LedgerCubit (state) and NavCubit (navigation)
+    theme.dart                  colours, fonts and control styles from the HTML prototype
     widgets.dart                shared widgets
     dialogs.dart                add money, new entry, transfer, replace partner,
                                 edit shares, new site, new partner, reverse

@@ -94,9 +94,9 @@ class EntriesTable extends StatelessWidget {
                     e.kind == EntryKind.replacement ||
                     e.allocations.isEmpty)
                 ? const Text('—')
-                : MoneyText(e.allocations.first.amount, bold: false),
+                : MoneyText(e.allocations.first.amount),
             e.canReverse
-                ? TextButton(
+                ? OutlinedButton(
                     onPressed: () =>
                         openDialog(context, ReverseDialog(entry: e)),
                     child: const Text('Reverse'))
@@ -135,21 +135,20 @@ class PlannedTable extends StatelessWidget {
                 const SizedBox(width: 6),
                 Pill('Overdue',
                     background: Theme.of(context).colorScheme.errorContainer,
-                    foreground:
-                        Theme.of(context).colorScheme.onErrorContainer),
+                    foreground: Theme.of(context).colorScheme.onErrorContainer),
               ],
             ]),
             if (showSite) SiteLink(ledger, p.siteId),
             Text(p.isIncome ? 'Income' : 'Expense',
                 style: const TextStyle(fontWeight: FontWeight.w600)),
             Text(p.note.isEmpty ? '—' : p.note),
-            MoneyText(p.signedAmount, bold: false),
+            MoneyText(p.signedAmount),
             Row(mainAxisSize: MainAxisSize.min, children: [
-              TextButton(
+              OutlinedButton(
                   onPressed: () =>
                       openDialog(context, NewEntryDialog(planned: p)),
                   child: const Text('Enter now')),
-              TextButton(
+              OutlinedButton(
                   onPressed: () =>
                       context.read<LedgerCubit>().deletePlanned(p.id),
                   child: const Text('Remove')),
@@ -185,7 +184,7 @@ class DashboardPage extends StatelessWidget {
                 FilledButton(
                     onPressed: () => openDialog(context, const NewSiteDialog()),
                     child: const Text('New site')),
-                TextButton(
+                OutlinedButton(
                     onPressed: () => context.read<LedgerCubit>().loadSample(),
                     child: const Text('Load sample data')),
               ],
@@ -242,8 +241,7 @@ class DashboardPage extends StatelessWidget {
             subtitle:
                 'Partners whose share of expenses is higher than what they have added.',
             trailing: Pill('${formatMoney(owed)} owed',
-                background: cs.errorContainer,
-                foreground: cs.onErrorContainer),
+                background: cs.errorContainer, foreground: cs.onErrorContainer),
             child: owing.isEmpty
                 ? const EmptyBox('Nobody is in negative.')
                 : Column(children: [
@@ -371,6 +369,8 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
         LinkText('Dashboard', onTap: () => nav.section(Section.dashboard)),
         const Text('  /  '),
         LinkText('Sites', onTap: () => nav.section(Section.sites)),
+        const Text('  /  '),
+        Flexible(child: Text(site.name, overflow: TextOverflow.ellipsis)),
       ]),
       actions: [
         OutlinedButton(
@@ -394,6 +394,9 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
         TwoColumns(
           left: SectionCard(
             title: 'Needs to add',
+            subtitle: owing.isEmpty
+                ? null
+                : '${owing.length} in negative on this site.',
             child: owing.isEmpty
                 ? const EmptyBox('Nobody is in negative on this site.')
                 : Column(children: [
@@ -444,36 +447,48 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
                         ]),
                       ),
                       const SizedBox(height: 10),
-                      Wrap(spacing: 16, runSpacing: 6, children: [
+                      const SizedBox(height: 2),
+                      Wrap(spacing: 18, runSpacing: 6, children: [
                         for (var i = 0; i < version.lines.length; i++)
                           Row(mainAxisSize: MainAxisSize.min, children: [
                             Container(
                               width: 10,
                               height: 10,
-                              color: cs.primary.withAlpha(
-                                  shades[i < shades.length ? i : 5]),
+                              decoration: BoxDecoration(
+                                color: cs.primary.withAlpha(
+                                    shades[i < shades.length ? i : 5]),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
                             ),
                             const SizedBox(width: 6),
-                            Text(
-                                '${l.partnerName(version.lines[i].partnerId)}  ${formatPercent(version.lines[i].bp)}'),
+                            Text.rich(
+                              TextSpan(children: [
+                                TextSpan(
+                                    text:
+                                        '${l.partnerName(version.lines[i].partnerId)} '),
+                                TextSpan(
+                                    text: formatPercent(version.lines[i].bp),
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700)),
+                              ]),
+                              style: const TextStyle(fontSize: 13),
+                            ),
                           ]),
                       ]),
                     ],
                   ),
           ),
         ),
-        SectionCard(
+        Panel(
+          padding: const EdgeInsets.fromLTRB(20, 6, 20, 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                for (var i = 0; i < _tabs.length; i++)
-                  ChoiceChip(
-                    label: Text(_tabs[i]),
-                    selected: _tab == i,
-                    onSelected: (_) => setState(() => _tab = i),
-                  ),
-              ]),
+              UnderlineTabs(
+                labels: _tabs,
+                selected: _tab,
+                onSelect: (i) => setState(() => _tab = i),
+              ),
               const SizedBox(height: 12),
               _tabBody(context, l, sid, pids, version),
             ],
@@ -513,10 +528,10 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
             NumText(b.other),
             MoneyText(b.balance),
             StatusChip(b.balance),
-            TextButton(
+            ActionButton('Add money',
+                primary: b.balance < 0,
                 onPressed: () => openDialog(
-                    context, AddMoneyDialog(siteId: sid, partnerId: p)),
-                child: const Text('Add money')),
+                    context, AddMoneyDialog(siteId: sid, partnerId: p))),
           ]);
         }
         return LedgerTable(
@@ -600,7 +615,7 @@ class _SiteDetailPageState extends State<SiteDetailPage> {
                 Text(
                     'Planned entries do not change balances until they are entered.',
                     style: TextStyle(fontSize: 13, color: mutedColor(context))),
-                TextButton(
+                OutlinedButton(
                     onPressed: () =>
                         context.read<NavCubit>().section(Section.planner),
                     child: const Text('Open planner')),
@@ -782,10 +797,10 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
         NumText(b.expense),
         NumText(b.other),
         MoneyText(b.balance),
-        TextButton(
+        ActionButton('Add money',
+            primary: b.balance < 0,
             onPressed: () => openDialog(
-                context, AddMoneyDialog(siteId: s.id, partnerId: pid)),
-            child: const Text('Add money')),
+                context, AddMoneyDialog(siteId: s.id, partnerId: pid))),
       ]);
     }
     final filter = sites.any((s) => s.id == _siteFilter) ? _siteFilter : 0;
@@ -802,6 +817,8 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
         LinkText('Dashboard', onTap: () => nav.section(Section.dashboard)),
         const Text('  /  '),
         LinkText('Partners', onTap: () => nav.section(Section.partners)),
+        const Text('  /  '),
+        Flexible(child: Text(partner.name, overflow: TextOverflow.ellipsis)),
       ]),
       actions: [
         OutlinedButton(
@@ -891,7 +908,7 @@ class _PartnerDetailPageState extends State<PartnerDetailPage> {
                             style:
                                 const TextStyle(fontWeight: FontWeight.w600)),
                         EntryDetailCell(l, r.entry),
-                        MoneyText(r.amount, bold: false),
+                        MoneyText(r.amount),
                         MoneyText(r.runningBalance),
                       ],
                   ],

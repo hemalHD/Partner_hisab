@@ -97,8 +97,8 @@ class _PlannerPageState extends State<PlannerPage> {
         rows.add([
           PartnerLink(l, r.partnerId),
           Text(formatPercent(r.bp)),
-          MoneyText(r.now, bold: false),
-          for (final x in r.monthEnd) MoneyText(x, bold: false),
+          MoneyText(r.now),
+          for (final x in r.monthEnd) MoneyText(x),
           Text(
             r.shortfall == 0
                 ? '—'
@@ -146,9 +146,9 @@ class _PlannerPageState extends State<PlannerPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Wrap(
-                spacing: 12,
+                spacing: 10,
                 runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.end,
                 children: [
                   SizedBox(
                     width: 220,
@@ -189,11 +189,13 @@ class _PlannerPageState extends State<PlannerPage> {
                   ),
                   SizedBox(
                     width: 260,
-                    child: TextField(
-                      controller: _note,
-                      decoration: const InputDecoration(
-                          labelText: 'Details', hintText: 'What is it for?'),
-                    ),
+                    child: LabeledField(
+                        label: 'Details',
+                        child: TextField(
+                          controller: _note,
+                          decoration: const InputDecoration(
+                              hintText: 'What is it for?'),
+                        )),
                   ),
                   FilledButton(
                       onPressed: () => _add(site),
@@ -279,7 +281,7 @@ class ReportsPage extends StatelessWidget {
           final b = l.balanceOf(s.id, p.id).balance;
           total += b;
           colTotals[i] += b;
-          cells.add(MoneyText(b, bold: false));
+          cells.add(MoneyText(b));
         } else {
           cells.add(const Text('·'));
         }
@@ -300,8 +302,8 @@ class ReportsPage extends StatelessWidget {
                   final messenger = ScaffoldMessenger.of(context);
                   await Clipboard.setData(ClipboardData(text: _csv()));
                   messenger.showSnackBar(const SnackBar(
-                      content: Text(
-                          'Copied. Paste into Excel or Google Sheets.')));
+                      content:
+                          Text('Copied. Paste into Excel or Google Sheets.')));
                 },
           child: const Text('Copy as CSV'),
         ),
@@ -369,7 +371,7 @@ class _SettingsPageState extends State<SettingsPage> {
         title: Text(title),
         content: SizedBox(width: 440, child: Text(body)),
         actions: [
-          TextButton(
+          OutlinedButton(
               onPressed: () => Navigator.of(c).pop(false),
               child: const Text('Keep my data')),
           FilledButton(
@@ -397,7 +399,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final nav = context.read<NavCubit>();
     final cs = Theme.of(context).colorScheme;
     return PageFrame(
-      title: 'Settings',
+      title: 'Data and backup',
       subtitle: 'Backup, restore and starting over.',
       children: [
         SectionCard(
@@ -443,15 +445,15 @@ class _SettingsPageState extends State<SettingsPage> {
                                 '${formatDate(isoDate(f.modified))}, ${f.modified.hour.toString().padLeft(2, '0')}:${f.modified.minute.toString().padLeft(2, '0')}  ·  ${f.name}',
                                 overflow: TextOverflow.ellipsis),
                           ),
-                          TextButton(
+                          OutlinedButton(
                             onPressed: () async {
                               final ok = await _confirm(
                                   'Restore this backup?',
                                   'This replaces everything currently in the ledger with the contents of ${f.name}. Back up first if you may need the current data.',
                                   'Restore');
                               if (!ok) return;
-                              await _guard(
-                                  () => cubit.restore(f.path), 'Backup restored');
+                              await _guard(() => cubit.restore(f.path),
+                                  'Backup restored');
                             },
                             child: const Text('Restore'),
                           ),
@@ -481,7 +483,9 @@ class _SettingsPageState extends State<SettingsPage> {
               child: const Text('Load sample data'),
             ),
             OutlinedButton(
-              style: OutlinedButton.styleFrom(foregroundColor: cs.error),
+              style: OutlinedButton.styleFrom(
+                  foregroundColor: cs.onErrorContainer,
+                  side: BorderSide(color: cs.error)),
               onPressed: () async {
                 final ok = await _confirm(
                     'Erase everything?',

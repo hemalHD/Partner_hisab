@@ -6,6 +6,7 @@ import '../domain/ledger.dart';
 import '../domain/ledger_service.dart';
 import '../domain/models.dart';
 import 'cubits.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 // ---------------------------------------------------------------- building blocks
@@ -68,35 +69,49 @@ class DialogFrame extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return AlertDialog(
-      title: Text(title),
-      content: SizedBox(
-        width: 560,
+    final c = LedgerColors.of(context);
+    final theme = Theme.of(context);
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 580),
         child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(subtitle,
-                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
-              for (final c in children) ...[const SizedBox(height: 14), c],
+              Text(title, style: theme.textTheme.titleLarge),
+              const SizedBox(height: 4),
+              Text(subtitle, style: TextStyle(fontSize: 13, color: c.mut)),
+              for (final child in children) ...[
+                const SizedBox(height: 16),
+                child,
+              ],
               if (error != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Text(error!,
                     style: TextStyle(
-                        color: cs.error, fontWeight: FontWeight.w600)),
+                        fontSize: 13,
+                        color: c.negInk,
+                        fontWeight: FontWeight.w600)),
               ],
+              const SizedBox(height: 16),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel')),
+                  FilledButton(onPressed: onSave, child: Text(cta)),
+                ],
+              ),
             ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel')),
-        FilledButton(onPressed: onSave, child: Text(cta)),
-      ],
     );
   }
 }
@@ -114,7 +129,7 @@ class FieldRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (var i = 0; i < children.length; i++) ...[
-              if (i > 0) const SizedBox(height: 14),
+              if (i > 0) const SizedBox(height: 16),
               children[i],
             ],
           ],
@@ -155,12 +170,17 @@ class DateField extends StatelessWidget {
         );
         if (picked != null) onChanged(isoDate(picked));
       },
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          suffixIcon: const Icon(Icons.calendar_today, size: 18),
+      borderRadius: BorderRadius.circular(8),
+      child: LabeledField(
+        label: label,
+        child: InputDecorator(
+          decoration: const InputDecoration(
+            suffixIcon: Icon(Icons.calendar_today_outlined, size: 18),
+            suffixIconConstraints: BoxConstraints(minWidth: 40, minHeight: 20),
+          ),
+          child: Text(value.isEmpty ? 'Choose' : formatDate(value),
+              style: const TextStyle(fontSize: 15)),
         ),
-        child: Text(value.isEmpty ? 'Choose' : formatDate(value)),
       ),
     );
   }
@@ -187,21 +207,27 @@ class ChoiceField<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final valid = options.any((o) => o.value == value);
-    return InputDecorator(
-      decoration: InputDecoration(labelText: label),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          value: valid ? value : null,
-          isExpanded: true,
-          isDense: true,
-          items: [
-            for (final o in options)
-              DropdownMenuItem<T>(
-                value: o.value,
-                child: Text(o.label, overflow: TextOverflow.ellipsis),
-              ),
-          ],
-          onChanged: options.isEmpty ? null : onChanged,
+    return LabeledField(
+      label: label,
+      child: InputDecorator(
+        decoration: const InputDecoration(
+            contentPadding: EdgeInsets.fromLTRB(11, 13, 8, 14)),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<T>(
+            value: valid ? value : null,
+            isExpanded: true,
+            isDense: true,
+            items: [
+              for (final o in options)
+                DropdownMenuItem<T>(
+                  value: o.value,
+                  child: Text(o.label, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            style: TextStyle(fontSize: 15, color: LedgerColors.of(context).fg),
+            borderRadius: BorderRadius.circular(8),
+            onChanged: options.isEmpty ? null : onChanged,
+          ),
         ),
       ),
     );
@@ -213,21 +239,28 @@ class AmountField extends StatelessWidget {
   final String label;
   final VoidCallback onChanged;
   final bool autofocus;
+  final String? hint;
   const AmountField(
       {super.key,
       required this.controller,
       required this.label,
       required this.onChanged,
-      this.autofocus = false});
+      this.autofocus = false,
+      this.hint});
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      autofocus: autofocus,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: InputDecoration(labelText: label, hintText: '0'),
-      onChanged: (_) => onChanged(),
+    return LabeledField(
+      label: label,
+      hint: hint,
+      child: TextField(
+        controller: controller,
+        autofocus: autofocus,
+        style: const TextStyle(fontSize: 15, fontFeatures: tabularFigures),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(hintText: '0'),
+        onChanged: (_) => onChanged(),
+      ),
     );
   }
 }
@@ -238,11 +271,12 @@ class PreviewBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final c = LedgerColors.of(context);
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest,
+        color: c.bg,
+        border: Border.all(color: c.line),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -292,16 +326,17 @@ class WarnBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final c = LedgerColors.of(context);
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: cs.errorContainer,
+        color: c.negSoft,
+        border: Border.all(color: c.neg),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(text,
           style: TextStyle(
-              color: cs.onErrorContainer, fontWeight: FontWeight.w600)),
+              fontSize: 13, color: c.negInk, fontWeight: FontWeight.w600)),
     );
   }
 }
@@ -432,12 +467,13 @@ class _AddMoneyDialogState extends State<AddMoneyDialog> with SaveMixin {
               child: Text('Clear negative · ${formatMoney(-balance)}'),
             ),
           ),
-        TextField(
-          controller: _note,
-          decoration: const InputDecoration(
-              labelText: 'Note (optional)',
-              hintText: 'Cash, cheque no., bank transfer'),
-        ),
+        LabeledField(
+            label: 'Note (optional)',
+            child: TextField(
+              controller: _note,
+              decoration: const InputDecoration(
+                  hintText: 'Cash, cheque no., bank transfer'),
+            )),
         if (partner == null)
           const WarnBox('This site has no partners yet. Set shares first.')
         else
@@ -534,7 +570,7 @@ class _NewEntryDialogState extends State<NewEntryDialog> with SaveMixin {
                 overflow: TextOverflow.ellipsis),
             [
               Text(formatPercent(version.lines[i].bp)),
-              MoneyText(parts[i].amount, bold: false),
+              MoneyText(parts[i].amount),
               MoneyText(l.balanceOf(site, version.lines[i].partnerId).balance +
                   parts[i].amount),
             ],
@@ -588,12 +624,13 @@ class _NewEntryDialogState extends State<NewEntryDialog> with SaveMixin {
             onChanged: () => setState(() {}),
           ),
         ]),
-        TextField(
-          controller: _note,
-          decoration: const InputDecoration(
-              labelText: 'Details (optional)',
-              hintText: 'What is this entry for?'),
-        ),
+        LabeledField(
+            label: 'Details (optional)',
+            child: TextField(
+              controller: _note,
+              decoration:
+                  const InputDecoration(hintText: 'What is this entry for?'),
+            )),
         preview,
       ],
     );
@@ -694,9 +731,9 @@ class _TransferDialogState extends State<TransferDialog> with SaveMixin {
             const [Text('Before'), Text('After')],
             header: true),
         PreviewLine(Text(l.siteName(from), overflow: TextOverflow.ellipsis),
-            [MoneyText(a, bold: false), MoneyText(a - amount)]),
+            [MoneyText(a), MoneyText(a - amount)]),
         PreviewLine(Text(l.siteName(to), overflow: TextOverflow.ellipsis),
-            [MoneyText(b, bold: false), MoneyText(b + amount)]),
+            [MoneyText(b), MoneyText(b + amount)]),
         if (amount > 0 && a - amount < 0) ...[
           const SizedBox(height: 8),
           WarnBox(
@@ -729,9 +766,7 @@ class _TransferDialogState extends State<TransferDialog> with SaveMixin {
           ChoiceField<int>(
             label: 'Partner',
             value: partner,
-            options: [
-              for (final p in l.data.partners) Choice(p.id, p.name)
-            ],
+            options: [for (final p in l.data.partners) Choice(p.id, p.name)],
             onChanged: (v) => setState(() {
               _partner = v;
               _from = null;
@@ -765,12 +800,13 @@ class _TransferDialogState extends State<TransferDialog> with SaveMixin {
             autofocus: true,
             onChanged: () => setState(() {}),
           ),
-          TextField(
-            controller: _note,
-            decoration: const InputDecoration(
-                labelText: 'Note (optional)',
-                hintText: 'Reason for the transfer'),
-          ),
+          LabeledField(
+              label: 'Note (optional)',
+              child: TextField(
+                controller: _note,
+                decoration:
+                    const InputDecoration(hintText: 'Reason for the transfer'),
+              )),
         ]),
         preview,
       ],
@@ -869,7 +905,7 @@ class _ReplacePartnerDialogState extends State<ReplacePartnerDialog>
                   overflow: TextOverflow.ellipsis),
               [
                 Text('${formatPercent(bp)} → 0%'),
-                MoneyText(balance, bold: false),
+                MoneyText(balance),
                 const MoneyText(0),
               ],
             ),
@@ -878,7 +914,7 @@ class _ReplacePartnerDialogState extends State<ReplacePartnerDialog>
                   overflow: TextOverflow.ellipsis),
               [
                 Text('0% → ${formatPercent(bp)}'),
-                const MoneyText(0, bold: false),
+                const MoneyText(0),
                 MoneyText(balance),
               ],
             ),
@@ -989,8 +1025,8 @@ class _EditSharesDialogState extends State<EditSharesDialog> with SaveMixin {
                     child: TextField(
                       controller: _pct[p.id],
                       textAlign: TextAlign.right,
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       decoration:
                           const InputDecoration(hintText: '0', suffixText: '%'),
                       onChanged: (_) => setState(() {}),
@@ -998,12 +1034,13 @@ class _EditSharesDialogState extends State<EditSharesDialog> with SaveMixin {
                   ),
                 ],
               ),
-        TextField(
-          controller: _note,
-          decoration: const InputDecoration(
-              labelText: 'Reason (optional)',
-              hintText: 'Why the shares changed'),
-        ),
+        LabeledField(
+            label: 'Reason (optional)',
+            child: TextField(
+              controller: _note,
+              decoration:
+                  const InputDecoration(hintText: 'Why the shares changed'),
+            )),
         PreviewBox(children: [
           Row(
             children: [
@@ -1092,18 +1129,21 @@ class _NewSiteDialogState extends State<NewSiteDialog> with SaveMixin {
         );
       },
       children: [
-        TextField(
-          controller: _name,
-          autofocus: true,
-          decoration: const InputDecoration(
-              labelText: 'Site name', hintText: 'e.g. Green Valley Plots'),
-        ),
+        LabeledField(
+            label: 'Site name',
+            child: TextField(
+              controller: _name,
+              autofocus: true,
+              decoration:
+                  const InputDecoration(hintText: 'e.g. Green Valley Plots'),
+            )),
         FieldRow([
-          TextField(
-            controller: _location,
-            decoration: const InputDecoration(
-                labelText: 'Location (optional)', hintText: 'Area or address'),
-          ),
+          LabeledField(
+              label: 'Location (optional)',
+              child: TextField(
+                controller: _location,
+                decoration: const InputDecoration(hintText: 'Area or address'),
+              )),
           DateField(
             label: 'Start date',
             value: _start,
@@ -1149,18 +1189,20 @@ class _NewPartnerDialogState extends State<NewPartnerDialog> with SaveMixin {
       ),
       children: [
         FieldRow([
-          TextField(
-            controller: _name,
-            autofocus: true,
-            decoration: const InputDecoration(
-                labelText: 'Name', hintText: 'Full name'),
-          ),
-          TextField(
-            controller: _phone,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-                labelText: 'Phone (optional)', hintText: 'Mobile number'),
-          ),
+          LabeledField(
+              label: 'Name',
+              child: TextField(
+                controller: _name,
+                autofocus: true,
+                decoration: const InputDecoration(hintText: 'Full name'),
+              )),
+          LabeledField(
+              label: 'Phone (optional)',
+              child: TextField(
+                controller: _phone,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(hintText: 'Mobile number'),
+              )),
         ]),
         CheckboxListTile(
           value: _company,

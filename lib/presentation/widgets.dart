@@ -1,3 +1,5 @@
+import 'dart:ui' show PathMetric;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -5,19 +7,21 @@ import '../core/format.dart';
 import '../domain/ledger.dart';
 import '../domain/models.dart';
 import 'cubits.dart';
+import 'theme.dart';
 
-const _tabular = [FontFeature.tabularFigures()];
+/// Below this width the sidebar turns into a bottom bar.
+const double kWideLayout = 760;
 
 void openDialog(BuildContext context, Widget dialog) {
   showDialog<void>(context: context, builder: (_) => dialog);
 }
 
 void showSnack(BuildContext context, String text) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(text, textAlign: TextAlign.center)));
 }
 
-Color mutedColor(BuildContext context) =>
-    Theme.of(context).colorScheme.onSurfaceVariant;
+Color mutedColor(BuildContext context) => LedgerColors.of(context).mut;
 
 /// Scrollable page with a title row and evenly spaced sections.
 class PageFrame extends StatelessWidget {
@@ -39,47 +43,73 @@ class PageFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final c = LedgerColors.of(context);
+    final wide = MediaQuery.sizeOf(context).width >= kWideLayout;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1320),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: wide
+          ? const EdgeInsets.fromLTRB(0, 20, 16, 32)
+          : const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.end,
+            spacing: 14,
+            runSpacing: 14,
             children: [
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.end,
-                spacing: 16,
-                runSpacing: 12,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (breadcrumb != null) ...[
-                        breadcrumb!,
-                        const SizedBox(height: 6),
-                      ],
-                      Text(title,
-                          style: theme.textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w700)),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 4),
-                        Text(subtitle!,
-                            style: theme.textTheme.bodyMedium
-                                ?.copyWith(color: mutedColor(context))),
-                      ],
-                    ],
-                  ),
-                  Wrap(spacing: 8, runSpacing: 8, children: actions),
+                  if (breadcrumb != null) ...[
+                    DefaultTextStyle.merge(
+                      style: TextStyle(fontSize: 13, color: c.mut),
+                      child: breadcrumb!,
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                  Text(title,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                          fontSize: wide ? 26 : 22, letterSpacing: -0.26)),
+                  if (subtitle != null && subtitle!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(subtitle!, style: TextStyle(color: c.mut)),
+                  ],
                 ],
               ),
-              for (final c in children) ...[const SizedBox(height: 16), c],
+              Wrap(spacing: 10, runSpacing: 10, children: actions),
             ],
           ),
-        ),
+          for (final child in children) ...[const SizedBox(height: 20), child],
+        ],
       ),
+    );
+  }
+}
+
+/// White card with a thin border. Used for every section of a page.
+class Panel extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final double radius;
+  const Panel(
+      {super.key,
+      required this.child,
+      this.padding = const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      this.radius = 12});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = LedgerColors.of(context);
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: c.panel,
+        border: Border.all(color: c.line),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: child,
     );
   }
 }
@@ -101,43 +131,31 @@ class SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (title != null || trailing != null)
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  if (title != null)
-                    Text(title!,
-                        style: theme.textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w600)),
-                  if (trailing != null) trailing!,
-                ],
-              ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 4),
-              Text(subtitle!,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: mutedColor(context))),
-            ],
-            if (title != null || trailing != null || subtitle != null)
-              const SizedBox(height: 10),
-            child,
+    final hasHead = title != null || trailing != null;
+    return Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (hasHead)
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 10,
+              runSpacing: 8,
+              children: [
+                if (title != null)
+                  Text(title!, style: theme.textTheme.titleMedium),
+                if (trailing != null) CompactButtons(child: trailing!),
+              ],
+            ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(subtitle!,
+                style: TextStyle(fontSize: 13, color: mutedColor(context))),
           ],
-        ),
+          if (hasHead || subtitle != null) const SizedBox(height: 8),
+          child,
+        ],
       ),
     );
   }
@@ -151,11 +169,14 @@ class StatRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, c) {
-      final cols = c.maxWidth >= 900 ? 4 : (c.maxWidth >= 480 ? 2 : 1);
-      final w = (c.maxWidth - 12 * (cols - 1)) / cols;
+      const gap = 16.0;
+      final cols = c.maxWidth >= 4 * 180 + 3 * gap
+          ? 4
+          : (c.maxWidth >= 2 * 150 + gap ? 2 : 1);
+      final w = (c.maxWidth - gap * (cols - 1)) / cols;
       return Wrap(
-        spacing: 12,
-        runSpacing: 12,
+        spacing: gap,
+        runSpacing: gap,
         children: [for (final x in children) SizedBox(width: w, child: x)],
       );
     });
@@ -170,24 +191,25 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SectionCard(
+    final c = LedgerColors.of(context);
+    return Panel(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: mutedColor(context))),
+          Text(label, style: TextStyle(fontSize: 13, color: c.mut)),
           const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
               value,
-              style: theme.textTheme.titleLarge?.copyWith(
+              style: TextStyle(
+                fontFamily: headFont,
+                fontSize: 22,
                 fontWeight: FontWeight.w700,
-                fontFeatures: _tabular,
-                color: negative ? theme.colorScheme.error : null,
+                fontFeatures: tabularFigures,
+                color: negative ? c.neg : c.fg,
               ),
             ),
           ),
@@ -206,7 +228,7 @@ class TwoColumns extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, c) {
-      if (c.maxWidth >= 900) {
+      if (c.maxWidth >= 2 * 340 + 16) {
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -224,21 +246,72 @@ class TwoColumns extends StatelessWidget {
   }
 }
 
-/// A balance. Negative is red with a minus sign, positive is the accent colour.
-class MoneyText extends StatelessWidget {
-  final int amount;
-  final bool bold;
-  const MoneyText(this.amount, {super.key, this.bold = true});
+/// Makes the buttons inside smaller, like the prototype's table and list
+/// buttons.
+class CompactButtons extends StatelessWidget {
+  final Widget child;
+  const CompactButtons({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final c = LedgerColors.of(context);
+    final touch = theme.platform == TargetPlatform.android ||
+        theme.platform == TargetPlatform.iOS;
+    final style = ButtonStyle(
+      minimumSize: WidgetStatePropertyAll(Size(0, touch ? 40 : 32)),
+      padding:
+          const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
+      textStyle: const WidgetStatePropertyAll(TextStyle(
+          fontFamily: bodyFont, fontSize: 13, fontWeight: FontWeight.w600)),
+      visualDensity: VisualDensity.compact,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    return Theme(
+      data: theme.copyWith(
+        filledButtonTheme: FilledButtonThemeData(
+            style: style.merge(theme.filledButtonTheme.style)),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+            style: style
+                .copyWith(foregroundColor: WidgetStatePropertyAll(c.accentInk))
+                .merge(theme.outlinedButtonTheme.style)),
+        textButtonTheme: TextButtonThemeData(
+            style: style.merge(theme.textButtonTheme.style)),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Filled when it is the thing to do next, outlined otherwise.
+class ActionButton extends StatelessWidget {
+  final String label;
+  final bool primary;
+  final VoidCallback? onPressed;
+  const ActionButton(this.label,
+      {super.key, this.primary = false, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) => primary
+      ? FilledButton(onPressed: onPressed, child: Text(label))
+      : OutlinedButton(onPressed: onPressed, child: Text(label));
+}
+
+/// A balance. Negative is red with a minus sign, positive is the accent
+/// colour, both bold. Zero is plain.
+class MoneyText extends StatelessWidget {
+  final int amount;
+  const MoneyText(this.amount, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = LedgerColors.of(context);
     return Text(
       formatSigned(amount),
       style: TextStyle(
-        fontFeatures: _tabular,
-        fontWeight: bold ? FontWeight.w700 : null,
-        color: amount < 0 ? cs.error : (amount > 0 ? cs.primary : null),
+        fontFeatures: tabularFigures,
+        fontWeight: amount != 0 ? FontWeight.w700 : null,
+        color: amount < 0 ? c.neg : (amount > 0 ? c.accentInk : null),
       ),
     );
   }
@@ -256,9 +329,9 @@ class NumText extends StatelessWidget {
     return Text(
       formatCell(amount),
       style: TextStyle(
-        fontFeatures: _tabular,
+        fontFeatures: tabularFigures,
         fontWeight: red ? FontWeight.w700 : null,
-        color: red ? Theme.of(context).colorScheme.error : null,
+        color: red || amount < 0 ? LedgerColors.of(context).neg : null,
       ),
     );
   }
@@ -272,11 +345,11 @@ class Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final c = LedgerColors.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
       decoration: BoxDecoration(
-        color: background ?? cs.surfaceContainerHighest,
+        color: background ?? c.soft,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
@@ -284,7 +357,7 @@ class Pill extends StatelessWidget {
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
-          color: foreground ?? cs.onSurfaceVariant,
+          color: foreground ?? c.fg,
         ),
       ),
     );
@@ -299,36 +372,51 @@ class StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final c = LedgerColors.of(context);
     if (balance < 0) {
-      return Pill('Needs to add',
-          background: cs.errorContainer, foreground: cs.onErrorContainer);
+      return Pill('Needs to add', background: c.negSoft, foreground: c.negInk);
     }
     if (balance > 0) {
       return Pill('Advance held',
-          background: cs.primaryContainer, foreground: cs.onPrimaryContainer);
+          background: c.accentSoft, foreground: c.accentInk);
     }
     return const Pill('Settled');
   }
 }
 
-class LinkText extends StatelessWidget {
+class LinkText extends StatefulWidget {
   final String text;
   final VoidCallback onTap;
   const LinkText(this.text, {super.key, required this.onTap});
 
   @override
+  State<LinkText> createState() => _LinkTextState();
+}
+
+class _LinkTextState extends State<LinkText> {
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Text(
-          text,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.primary,
+    final c = LedgerColors.of(context);
+    return Semantics(
+      link: true,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Text(
+            widget.text,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: c.accentInk,
+              decoration:
+                  _hover ? TextDecoration.underline : TextDecoration.none,
+              decorationColor: c.accentInk,
+            ),
           ),
         ),
       ),
@@ -349,8 +437,10 @@ class PartnerLink extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        LinkText(p.name,
-            onTap: () => context.read<NavCubit>().go(AppRoute.partner(p.id))),
+        Flexible(
+          child: LinkText(p.name,
+              onTap: () => context.read<NavCubit>().go(AppRoute.partner(p.id))),
+        ),
         if (showTag) ...[const SizedBox(width: 6), const Pill('Company')],
       ],
     );
@@ -375,8 +465,9 @@ class Col {
   const Col(this.label, {this.numeric = false});
 }
 
-/// A data table that fills the available width and scrolls sideways when the
-/// window is too narrow. [footer] is shown as a bold totals row.
+/// A table that fills the available width and scrolls sideways when the
+/// window is too narrow. Header on a grey band, a line under each row, and
+/// [footer] as a bold totals row.
 class LedgerTable extends StatelessWidget {
   final List<Col> columns;
   final List<List<Widget>> rows;
@@ -389,38 +480,84 @@ class LedgerTable extends StatelessWidget {
     this.footer,
   });
 
+  Widget _cell(Widget child, Col col, EdgeInsets padding) => Padding(
+        padding: padding,
+        child: Align(
+          alignment: col.numeric ? Alignment.centerRight : Alignment.centerLeft,
+          widthFactor: 1,
+          child: child,
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return LayoutBuilder(builder: (context, c) {
-      return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minWidth: c.maxWidth),
-          child: DataTable(
-            columnSpacing: 24,
-            horizontalMargin: 12,
-            headingRowHeight: 40,
-            headingTextStyle: theme.textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: mutedColor(context),
+    final c = LedgerColors.of(context);
+    const head = EdgeInsets.symmetric(horizontal: 12, vertical: 9);
+    const body = EdgeInsets.symmetric(horizontal: 12, vertical: 11);
+    final headStyle = TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.5,
+      color: c.mut,
+    );
+    return LayoutBuilder(builder: (context, box) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: box.maxWidth),
+            child: CompactButtons(
+              child: DefaultTextStyle.merge(
+                style: const TextStyle(fontFeatures: tabularFigures),
+                child: Table(
+                  defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                  // No flex: spare width is shared evenly by every column,
+                  // so the table fits exactly (flex columns can overshoot).
+                  defaultColumnWidth: const IntrinsicColumnWidth(),
+                  children: [
+                    TableRow(
+                      decoration: BoxDecoration(
+                        color: c.soft,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      children: [
+                        for (final col in columns)
+                          _cell(
+                              Text(col.label.toUpperCase(),
+                                  style: headStyle, softWrap: false),
+                              col,
+                              head),
+                      ],
+                    ),
+                    for (final r in rows)
+                      TableRow(
+                        decoration: BoxDecoration(
+                            border: Border(bottom: BorderSide(color: c.line))),
+                        children: [
+                          for (var i = 0; i < columns.length; i++)
+                            _cell(i < r.length ? r[i] : const SizedBox(),
+                                columns[i], body),
+                        ],
+                      ),
+                    if (footer != null)
+                      TableRow(children: [
+                        for (var i = 0; i < columns.length; i++)
+                          _cell(
+                              DefaultTextStyle.merge(
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700),
+                                child: i < footer!.length
+                                    ? footer![i]
+                                    : const SizedBox(),
+                              ),
+                              columns[i],
+                              body),
+                      ]),
+                  ],
+                ),
+              ),
             ),
-            columns: [
-              for (final col in columns)
-                DataColumn(label: Text(col.label), numeric: col.numeric),
-            ],
-            rows: [
-              for (final r in rows)
-                DataRow(cells: [for (final w in r) DataCell(w)]),
-              if (footer != null)
-                DataRow(cells: [
-                  for (final w in footer!)
-                    DataCell(DefaultTextStyle.merge(
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                      child: w,
-                    )),
-                ]),
-            ],
           ),
         ),
       );
@@ -435,26 +572,58 @@ class EmptyBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
-      decoration: BoxDecoration(
-        border: Border.all(color: cs.outlineVariant),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        children: [
-          Text(text,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: cs.onSurfaceVariant)),
-          if (actions.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(spacing: 8, runSpacing: 8, children: actions),
-          ],
-        ],
+    final c = LedgerColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: CustomPaint(
+        painter: _DashedBorder(color: c.line, radius: 10),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 18),
+          child: Column(
+            children: [
+              Text(text,
+                  textAlign: TextAlign.center, style: TextStyle(color: c.mut)),
+              if (actions.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: actions),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
+}
+
+class _DashedBorder extends CustomPainter {
+  final Color color;
+  final double radius;
+  const _DashedBorder({required this.color, required this.radius});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final path = Path()
+      ..addRRect(
+          RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)));
+    const dash = 4.0, gap = 3.0;
+    for (final PathMetric m in path.computeMetrics()) {
+      for (var d = 0.0; d < m.length; d += dash + gap) {
+        canvas.drawPath(m.extractPath(d, d + dash), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorder old) =>
+      old.color != color || old.radius != radius;
 }
 
 /// One line in a list: a partner with a site under it, an amount, an action.
@@ -473,11 +642,10 @@ class BalanceLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final c = LedgerColors.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: cs.outlineVariant))),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(border: Border(top: BorderSide(color: c.line))),
       child: Row(
         children: [
           Expanded(
@@ -485,15 +653,100 @@ class BalanceLine extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 title,
-                Text(subtitle,
-                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                Text(subtitle, style: TextStyle(fontSize: 12, color: c.mut)),
               ],
             ),
           ),
+          const SizedBox(width: 12),
           MoneyText(amount),
-          if (action != null) ...[const SizedBox(width: 12), action!],
+          if (action != null) ...[
+            const SizedBox(width: 12),
+            CompactButtons(child: action!),
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// Underlined tabs, as on the site page.
+class UnderlineTabs extends StatelessWidget {
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onSelect;
+  const UnderlineTabs(
+      {super.key,
+      required this.labels,
+      required this.selected,
+      required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = LedgerColors.of(context);
+    return Container(
+      decoration:
+          BoxDecoration(border: Border(bottom: BorderSide(color: c.line))),
+      child: Wrap(
+        spacing: 2,
+        children: [
+          for (var i = 0; i < labels.length; i++)
+            Semantics(
+              selected: i == selected,
+              button: true,
+              child: InkWell(
+                onTap: () => onSelect(i),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        width: 2,
+                        color: i == selected ? c.accent : Colors.transparent,
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    labels[i],
+                    style: TextStyle(
+                      fontWeight:
+                          i == selected ? FontWeight.w600 : FontWeight.w500,
+                      color: i == selected ? c.accentInk : c.mut,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A form field with its label above it and an optional hint below.
+class LabeledField extends StatelessWidget {
+  final String label;
+  final String? hint;
+  final Widget child;
+  const LabeledField(
+      {super.key, required this.label, required this.child, this.hint});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = LedgerColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 5),
+        child,
+        if (hint != null) ...[
+          const SizedBox(height: 5),
+          Text(hint!, style: TextStyle(fontSize: 12, color: c.mut)),
+        ],
+      ],
     );
   }
 }

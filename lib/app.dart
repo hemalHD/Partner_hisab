@@ -9,24 +9,13 @@ import 'presentation/cubits.dart';
 import 'presentation/dialogs.dart';
 import 'presentation/pages_main.dart';
 import 'presentation/pages_more.dart';
+import 'presentation/theme.dart';
 import 'presentation/widgets.dart';
 
 class LedgerApp extends StatelessWidget {
   final LedgerService service;
   final BackupService backups;
   const LedgerApp({super.key, required this.service, required this.backups});
-
-  ThemeData _theme(Brightness brightness) => ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1A56B0),
-          brightness: brightness,
-        ),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-          isDense: true,
-        ),
-      );
 
   @override
   Widget build(BuildContext context) {
@@ -38,8 +27,8 @@ class LedgerApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Partner Ledger',
         debugShowCheckedModeBanner: false,
-        theme: _theme(Brightness.light),
-        darkTheme: _theme(Brightness.dark),
+        theme: buildLedgerTheme(Brightness.light),
+        darkTheme: buildLedgerTheme(Brightness.dark),
         home: const Shell(),
       ),
     );
@@ -49,20 +38,24 @@ class LedgerApp extends StatelessWidget {
 class _Destination {
   final Section section;
   final String label;
+  final String shortLabel;
   final IconData icon;
-  const _Destination(this.section, this.label, this.icon);
+  const _Destination(this.section, this.label, this.icon, [String? short])
+      : shortLabel = short ?? label;
 }
 
 const _destinations = [
-  _Destination(Section.dashboard, 'Dashboard', Icons.dashboard_outlined),
+  _Destination(
+      Section.dashboard, 'Dashboard', Icons.dashboard_outlined, 'Home'),
   _Destination(Section.sites, 'Sites', Icons.apartment_outlined),
   _Destination(Section.partners, 'Partners', Icons.group_outlined),
   _Destination(Section.planner, 'Planner', Icons.event_note_outlined),
   _Destination(Section.reports, 'Reports', Icons.description_outlined),
-  _Destination(Section.settings, 'Settings', Icons.settings_outlined),
+  _Destination(
+      Section.settings, 'Data and backup', Icons.backup_outlined, 'Backup'),
 ];
 
-/// Navigation rail on wide windows, bottom bar on narrow ones.
+/// Sidebar card on wide windows, bottom bar on narrow ones.
 class Shell extends StatelessWidget {
   const Shell({super.key});
 
@@ -122,7 +115,9 @@ class Shell extends StatelessWidget {
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyN, control: true): () {
-          if (hasSites) openDialog(context, NewEntryDialog(siteId: route.siteId));
+          if (hasSites) {
+            openDialog(context, NewEntryDialog(siteId: route.siteId));
+          }
         },
         const SingleActivator(LogicalKeyboardKey.keyM, control: true): () {
           if (hasSites) {
@@ -144,7 +139,7 @@ class Shell extends StatelessWidget {
       child: Focus(
         autofocus: true,
         child: LayoutBuilder(builder: (context, c) {
-          if (c.maxWidth < 760) {
+          if (c.maxWidth < kWideLayout) {
             return Scaffold(
               body: SafeArea(child: page),
               bottomNavigationBar: NavigationBar(
@@ -154,42 +149,147 @@ class Shell extends StatelessWidget {
                     NavigationDestinationLabelBehavior.onlyShowSelected,
                 destinations: [
                   for (final d in _destinations)
-                    NavigationDestination(icon: Icon(d.icon), label: d.label),
+                    NavigationDestination(
+                        icon: Icon(d.icon), label: d.shortLabel),
                 ],
               ),
             );
           }
           return Scaffold(
             body: SafeArea(
-              child: Row(
-                children: [
-                  NavigationRail(
-                    extended: c.maxWidth >= 1100,
-                    selectedIndex: index < 0 ? 0 : index,
-                    onDestinationSelected: select,
-                    leading: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: CircleAvatar(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor:
-                            Theme.of(context).colorScheme.onPrimary,
-                        child: const Text('₹',
-                            style: TextStyle(fontWeight: FontWeight.w700)),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1500),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 20, 24, 20),
+                        child: _Sidebar(
+                            selected: index < 0 ? 0 : index, onSelect: select),
                       ),
-                    ),
-                    destinations: [
-                      for (final d in _destinations)
-                        NavigationRailDestination(
-                            icon: Icon(d.icon), label: Text(d.label)),
+                      Expanded(child: page),
                     ],
                   ),
-                  const VerticalDivider(width: 1),
-                  Expanded(child: page),
-                ],
+                ),
               ),
             ),
           );
         }),
+      ),
+    );
+  }
+}
+
+class _Sidebar extends StatelessWidget {
+  final int selected;
+  final ValueChanged<int> onSelect;
+  const _Sidebar({required this.selected, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = LedgerColors.of(context);
+    return SizedBox(
+      width: 212,
+      child: Panel(
+        radius: 14,
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Row(children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: c.accent,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text('₹',
+                      style: TextStyle(
+                          color: c.accentFg,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Partner Ledger',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
+                      Text('Site investments',
+                          style: TextStyle(fontSize: 12, color: c.mut)),
+                    ],
+                  ),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 18),
+            for (var i = 0; i < _destinations.length; i++) ...[
+              if (i > 0) const SizedBox(height: 4),
+              _NavItem(
+                label: _destinations[i].label,
+                selected: i == selected,
+                onTap: () => onSelect(i),
+              ),
+            ],
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: c.soft,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Data is saved on this computer. A backup is made the first time the app opens each day.',
+                style: TextStyle(fontSize: 12, color: c.mut),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _NavItem(
+      {required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = LedgerColors.of(context);
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: Material(
+        color: selected ? c.accentSoft : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          hoverColor: c.soft,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                color: selected ? c.accentInk : c.fg,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
